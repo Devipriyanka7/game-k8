@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+    tools{
+        jdk 'myjdk'
+        nodejs 'mynodejs'
+    }
+    environment{
+        K8S_SERVER = "https://api-mycluster-k8s-local-9s4spt-6db6a48270672bb9.elb.us-east-1.amazonaws.com" 
+    }
+
+    stages {
+        stage('cleaws') {
+            steps {
+             cleanWs()
+            }
+        }
+        stage('code') {
+            steps {
+               git 'https://github.com/Devipriyanka7/game-k8.git'
+            }
+        }
+        stage('npm'){
+            steps{  
+                
+            sh 'npm install'
+            }
+        }
+        stage('build'){
+            steps{  
+                sh 'docker build -t devipriyanka7/mygame:v1 .'
+            }
+        }
+         stage('push'){
+            steps{  
+                script{
+                    withDockerRegistry(credentialsId: 'dockerhubpwd') {
+                        sh 'docker push devipriyanka7/mygame:v1'
+                    }
+                }
+            }
+        }
+        stage('Deploy To Kubernetes') {
+            steps {
+                withKubeCredentials(kubectlCredentials: [[caCertificate: '', clusterName: 'mycluster', contextName: '', credentialsId: 'k8-token', namespace: 'dev', serverUrl: 'https://api-mycluster-k8s-local-9s4spt-6db6a48270672bb9.elb.us-east-1.amazonaws.com']]) {
+                    sh "kubectl apply -f deployment-service.yml"
+                    
+                }
+            }
+        }
+    }
+}
